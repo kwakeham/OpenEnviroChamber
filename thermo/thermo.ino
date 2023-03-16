@@ -49,6 +49,9 @@ ArduPID heatController;
 ArduPID coolController;
 
 SCPI_Parser my_instrument;
+int brightness = 0;
+const int ledPin = 13;
+const int intensity[11] = {0, 3, 5, 9, 15, 24, 38, 62, 99, 159, 255};
 
 
 void setup() {
@@ -86,11 +89,12 @@ void setup() {
   coolController.setSampleTime(compressor_rest_time);      // This should prevent compressor starting more than once per compressor_reset_time
 
   //scpi setup
+  statusupdate("Waiting", system_running);
 }
 
 
 void loop(void) {
-  statusupdate("Waiting", system_running);
+  my_instrument.ProcessInput(Serial, "\n");
   readtemp();
   temperature_control();
   display.display();
