@@ -51,14 +51,13 @@ ArduPID coolController;
 
 void setup() {
 
-  Serial.begin(9600);
+  Serial.begin(115200);
 
 //  while (!Serial) delay(1); // wait for Serial on Leonardo/Zero, etc
 
   // initialize the display
   // note you may have to change the address
   // the most common are 0X3C and 0X3D
-
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.display();
   display.clearDisplay();
