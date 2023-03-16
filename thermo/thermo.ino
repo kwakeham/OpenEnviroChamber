@@ -8,10 +8,9 @@ Frigidbear
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "ArduPID.h"
-#inc
+#include "Vrekrer_scpi_parser.h"
 
 #define compressor_rest_time 60000 //5 minutes?
-
 
 #define compressor_pin 12
 #define heater_pin 13
@@ -25,8 +24,6 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define MAXCS   10
 Adafruit_MAX31855 thermocouple(MAXCS);
 
-ArduPID myController;
-
 enum chamber_state_t {
   unknown_state,
   idle_state,
@@ -34,42 +31,22 @@ enum chamber_state_t {
   heating_state
 };
 
-int menu_xpos = 0;
-int menu_ypos = 0;
-
-int menu_xmove = 0;
-int menu_ymove = 0;
-
-int cold_temp = 15;
-int hot_temp = 40;
-int cold_time = 15;
-int hot_time = 15;
-
-int count;
-
 bool system_running = false;
-
+bool compressor_state = false;
 chamber_state_t chamber_state = idle_state;
 double chamber_temp;
 
-unsigned long OldTime;
-unsigned long counter;
-bool currentstatus = false;
-bool compressor_running = false;
-unsigned long compressor_stop_time;
-bool compressor_state = false;
-
-bool temp_stable = false;
-unsigned long temp_stable_time = 0;
-
 //ardupid
-double input;
 double output;
 // Arbitrary setpoint and gains - adjust these as fit for your project:
 double setpoint = 0;
 double p = 30;
 double i = 0.1;
 double d = 0;
+
+ArduPID heatController;
+ArduPID coolController;
+
 
 
 void setup() {
@@ -98,30 +75,29 @@ void setup() {
   }
   Serial.println("DONE.");
 
-  //set the SSR pin output
-  pinMode(compressor_pin, OUTPUT);    // sets the digital pin 13 as output
+  //set the SSR and Mosfet pin output
+  pinMode(compressor_pin, OUTPUT);
   pinMode(heater_pin, OUTPUT);
 
 
-  myController.begin(&input, &output, &setpoint, p, i, d);
+  heatController.begin(&chamber_temp, &output, &setpoint, p, i, d);
   // myController.reverse()               // Uncomment if controller output is "reversed"
   // myController.setSampleTime(10);      // OPTIONAL - will ensure at least 10ms have past between successful compute() calls
-  myController.setOutputLimits(0, 180);
-//  myController.setBias(255.0 / 2.0);
-  myController.setWindUpLimits(0, 100); // Growth bounds for the integral term to prevent integral wind-up
-  
-//  myController.start();
+  heatController.setOutputLimits(0, 180);
+  // myController.setBias(255.0 / 2.0);
+  heatController.setWindUpLimits(0, 100); // Growth bounds for the integral term to prevent integral wind-up
+  // myController.start();
   // myController.reset();               // Used for resetting the I and D terms - only use this if you know what you're doing
-   myController.stop();                // Turn off the PID controller (compute() will not do anything until start() is called)
+  heatController.stop();                // Turn off the PID controller (compute() will not do anything until start() is called)
+  
+  coolController.begin(&chamber_temp, &output, &setpoint, p, i, d);
+  coolController.setSampleTime(compressor_rest_time);      // OPTIONAL - will ensure at least 10ms have past between successful compute() calls
+
   
 }
 
 void loop(void) {
-
-  joytstickupdate();
-  statusupdate("Waiting", currentstatus);
-  valueupdate();
-  menuselect();
+  statusupdate("Waiting", system_running);
   readtemp();
   temperature_control();
   
@@ -149,19 +125,19 @@ void temperature_control(void)
   else //if not running make sure to shut off compressor
   {
     compressor_state = false;
-    
     compressor_control(compressor_state);
+    heater_control(0);
   }
 }
 
 void compressor_control(bool run_compressor)
 {
-
+  // digitalWrite(compressor_pin, HIGH);
 }
 
-void compressor_control(uint heatvalue)
+void heater_control(unsigned int heatvalue)
 {
-  analogWrite(heater_pin, 0); //ensure heater is off
+  analogWrite(heater_pin, heatvalue); //ensure heater is off
 }
 
 void readtemp(void)
