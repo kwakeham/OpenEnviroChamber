@@ -10,7 +10,7 @@ Frigidbear
 #include "ArduPID.h"
 #include "Vrekrer_scpi_parser.h"
 
-#define compressor_rest_time 6000//0 //60 seconds
+#define compressor_rest_time 60000 //60 seconds
 
 #define compressor_pin 12
 #define heater_pin 13
@@ -159,6 +159,13 @@ void temperature_control(void)
         coolController.compute();
         compressor_control(cool_output);
         heater_control(0); //ensure off
+        coolController.debug(&Serial, "cc", PRINT_INPUT    | // Can include or comment out any of these terms to print
+                                              PRINT_OUTPUT   | // in the Serial plotter
+                                              PRINT_SETPOINT |
+                                              PRINT_BIAS     |
+                                              PRINT_P        |
+                                              PRINT_I        |
+                                              PRINT_D);
         break;
       case heating_state:
         heatController.compute();
