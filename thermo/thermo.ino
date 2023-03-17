@@ -81,18 +81,8 @@ void setup() {
 #endif // RST_PIN >= 0
 
   oled.setFont(Adafruit5x7);
-
-  uint32_t m = micros();
   oled.clear();
-  oled.println("Hello world!");
-  oled.println("A long line may be truncated");
-  oled.println();
-  oled.set2X();
-  oled.println("2X demo");
-  oled.set1X();
-  oled.print("\nmicros: ");
-  oled.print(micros() - m);
-  
+
   //ensure the MAX31855 responds
   Serial.println("MAX31855 test");
   delay(200);  // wait for MAX chip to stabilize
@@ -121,7 +111,8 @@ void setup() {
 
   my_instrument.RegisterCommand(F("*IDN?"), &Identify);
   my_instrument.SetCommandTreeBase(F("SYSTem:ENVI"));
-    my_instrument.RegisterCommand(F(":TEMPerature"), &SetTemperature);
+    my_instrument.RegisterCommand(F(":SETTemperature"), &SetTemperature);
+    my_instrument.RegisterCommand(F(":GETSettemperature"), &GetSetTemperature);
     my_instrument.RegisterCommand(F(":TEMPerature?"), &GetTemperature);
     my_instrument.RegisterCommand(F(":COOL"), &GetTemperature);
     my_instrument.RegisterCommand(F(":HEAT"), &GetTemperature);
@@ -135,12 +126,10 @@ void setup() {
 
 
 void loop(void) {
-  my_instrument.ProcessInput(Serial, "\n");
   readtemp();
+  my_instrument.ProcessInput(Serial, "\n");
   temperature_control();
   // display.display();
-  delay(100);
-
 }
 
 
@@ -184,13 +173,13 @@ void heater_control(unsigned int heatvalue)
 //MAX31855 Thermocouple
 void readtemp(void)
 {
-  double temporary_temp = thermocouple.readCelsius();
-  if (isnan(temporary_temp)) {
+  double temporary_temperature = thermocouple.readCelsius();
+  if (isnan(temporary_temperature)) {
      Serial.println("Something wrong with thermocouple!");
   }
   else
   {
-    chamber_temp = temporary_temp;
+    chamber_temp = temporary_temperature;
     oled.setCursor(90,2);
     oled.print(chamber_temp);
     oled.print("c");
@@ -201,25 +190,6 @@ void readtemp(void)
 //OLED
 void statusupdate(String currentstatus, bool runningstatus)
 {
-  // display.setTextSize(1);             // Normal 1:1 pixel scale
-  // if(system_running)
-  // {
-  //   display.clearDisplay();
-  //   display.fillRect(0, 0, SCREEN_WIDTH, 16, WHITE);
-  //   display.setTextColor(BLACK);        // Draw white text
-  //   display.setCursor(30,4);             // Start at top-left corner
-  //   display.print("Running");
-    
-  // } else
-  // {
-    
-  //   display.clearDisplay();
-  //   display.drawRect(0, 0, SCREEN_WIDTH, 16, WHITE);
-  //   display.setTextColor(WHITE);        // Draw white text
-  //   display.setCursor(30,4);             // Start at top-left corner
-  //   display.print(currentstatus);
-  // }
-  oled.setFont(Adafruit5x7);
   oled.clear();
   oled.print(currentstatus);
 }
@@ -235,11 +205,15 @@ void Identify(SCPI_C commands, SCPI_P parameters, Stream& interface) {
 void SetTemperature(SCPI_C commands, SCPI_P parameters, Stream& interface) {
   // For simplicity no bad parameter check is done.
   if (parameters.Size() > 0) {
-    brightness = constrain(String(parameters[0]).toInt(), 0, 10);
-    analogWrite(ledPin, intensity[brightness]);
+    setpoint = constrain(String(parameters[0]).toInt(), 0, 10);
+    // analogWrite(ledPin, intensity[brightness]);
   }
 }
 
 void GetTemperature(SCPI_C commands, SCPI_P parameters, Stream& interface) {
-  interface.println(String(brightness, DEC));
+  interface.println(String(chamber_temp, DEC));
+}
+
+void GetSetTemperature(SCPI_C commands, SCPI_P parameters, Stream& interface) {
+  interface.println(String(setpoint, DEC));
 }
