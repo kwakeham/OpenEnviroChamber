@@ -112,10 +112,11 @@ void setup() {
   my_instrument.RegisterCommand(F("*IDN?"), &Identify);
   my_instrument.SetCommandTreeBase(F("SYSTem:ENVI"));
     my_instrument.RegisterCommand(F(":SETTemperature"), &SetTemperature);
-    my_instrument.RegisterCommand(F(":GETSettemperature"), &GetSetTemperature);
+    my_instrument.RegisterCommand(F(":GETSettemperature?"), &GetSetTemperature);
     my_instrument.RegisterCommand(F(":TEMPerature?"), &GetTemperature);
-    my_instrument.RegisterCommand(F(":COOL"), &GetTemperature);
-    my_instrument.RegisterCommand(F(":HEAT"), &GetTemperature);
+    my_instrument.RegisterCommand(F(":COOL"), &ChamberRun);
+    my_instrument.RegisterCommand(F(":HEAT"), &ChamberRun);
+    my_instrument.RegisterCommand(F(":STAT?"), &ChamberState);
     
   my_instrument.PrintDebugInfo(Serial);
 
@@ -205,15 +206,35 @@ void Identify(SCPI_C commands, SCPI_P parameters, Stream& interface) {
 void SetTemperature(SCPI_C commands, SCPI_P parameters, Stream& interface) {
   // For simplicity no bad parameter check is done.
   if (parameters.Size() > 0) {
-    setpoint = constrain(String(parameters[0]).toInt(), 0, 10);
-    // analogWrite(ledPin, intensity[brightness]);
+    setpoint = constrain(String(parameters[0]).toInt(), 0, 255);
   }
 }
 
 void GetTemperature(SCPI_C commands, SCPI_P parameters, Stream& interface) {
+  interface.print(":GETTemperature: ");
   interface.println(String(chamber_temp, DEC));
 }
 
 void GetSetTemperature(SCPI_C commands, SCPI_P parameters, Stream& interface) {
+  interface.print(":GETSettemperature: ");
   interface.println(String(setpoint, DEC));
+}
+
+void ChamberRun(SCPI_C commands, SCPI_P parameters, Stream& interface) {
+  String last_header = String(commands.Last());
+  last_header.toUpperCase();
+  if (last_header.startsWith("HEAT")) {
+    chamber_state = heating_state;
+  } else { // "DEC"
+    chamber_state = cooling_state;
+  }
+}
+void ChamberState(SCPI_C commands, SCPI_P parameters, Stream& interface) {
+  if (chamber_state == heating_state)
+  {
+    interface.println(":heating_state");
+  } else if (chamber_state == cooling_state)
+  { // "DEC"
+    interface.println(":cooling_state");
+  }
 }
