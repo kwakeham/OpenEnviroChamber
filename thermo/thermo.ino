@@ -13,7 +13,7 @@ Frigidbear
 #define compressor_rest_time 600//00 //60 seconds
 
 #define compressor_pin 12
-#define heater_pin 11
+#define heater_pin 13
 
 // #define SCREEN_WIDTH 128 // OLED display width, in pixels
 // #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -43,7 +43,8 @@ chamber_state_t chamber_state = idle_state;
 double chamber_temp;
 
 //ardupid
-double output;
+double heat_output;
+double cool_output;
 // Arbitrary setpoint and gains - adjust these as fit for your project:
 double setpoint = 0;
 double p = 30;
@@ -99,11 +100,11 @@ void setup() {
   pinMode(heater_pin, OUTPUT);
 
   //setup the two controllers.
-  heatController.begin(&chamber_temp, &output, &setpoint, p, i, d);
+  heatController.begin(&chamber_temp, &heat_output, &setpoint, p, i, d);
   heatController.setOutputLimits(0, 180);
   heatController.setWindUpLimits(0, 100); // Growth bounds for the integral term to prevent integral wind-up
   heatController.stop();                // Turn off the PID controller (compute() will not do anything until start() is called)
-  coolController.begin(&chamber_temp, &output, &setpoint, p, i, d);
+  coolController.begin(&chamber_temp, &cool_output, &setpoint, p, i, d);
   coolController.setSampleTime(compressor_rest_time);      // This should prevent compressor starting more than once per compressor_reset_time
 
   //scpi setup
@@ -114,15 +115,17 @@ void setup() {
     my_instrument.RegisterCommand(F(":SETTemperature"), &SetTemperature);
     my_instrument.RegisterCommand(F(":GETSettemperature?"), &GetSetTemperature);
     my_instrument.RegisterCommand(F(":TEMPerature?"), &GetTemperature);
-    my_instrument.RegisterCommand(F(":COOL"), &ChamberRun);
-    my_instrument.RegisterCommand(F(":HEAT"), &ChamberRun);
+    my_instrument.RegisterCommand(F(":COOL"), &ChamberMode);
+    my_instrument.RegisterCommand(F(":HEAT"), &ChamberMode);
     my_instrument.RegisterCommand(F(":STAT?"), &ChamberState);
+    my_instrument.RegisterCommand(F(":RUN"), &ChamberRun);
+    my_instrument.RegisterCommand(F(":RUN?"), &isChamberRun);
+    my_instrument.RegisterCommand(F(":STOP"), &ChamberStop);
     
   my_instrument.PrintDebugInfo(Serial);
 
-  pinMode(ledPin, OUTPUT);
-  pinMode(LED_BUILTIN, INPUT);
-  analogWrite(ledPin, 0);
+  // pinMode(ledPin, OUTPUT);
+  // analogWrite(ledPin, 0);
 }
 
 
@@ -131,6 +134,15 @@ void loop(void) {
   my_instrument.ProcessInput(Serial, "\n");
   temperature_control();
   // display.display();
+  heatController.debug(&Serial, "heatController", PRINT_INPUT    | // Can include or comment out any of these terms to print
+                                              PRINT_OUTPUT   | // in the Serial plotter
+                                              PRINT_SETPOINT |
+                                              PRINT_BIAS     |
+                                              PRINT_P        |
+                                              PRINT_I        |
+                                              PRINT_D);
+  delay(500);
+  
 }
 
 
@@ -147,6 +159,9 @@ void temperature_control(void)
       case cooling_state:
         break;
       case heating_state:
+        heatController.compute();
+        heater_control(heat_output);
+        compressor_control(false); //ensure off
         break;
       default:
         break;
@@ -165,7 +180,7 @@ void compressor_control(bool run_compressor)
   // digitalWrite(compressor_pin, HIGH);
 }
 
-void heater_control(unsigned int heatvalue)
+void heater_control(double heatvalue)
 {
   analogWrite(heater_pin, heatvalue); //ensure heater is off
 }
@@ -220,13 +235,17 @@ void GetSetTemperature(SCPI_C commands, SCPI_P parameters, Stream& interface) {
   interface.println(String(setpoint, DEC));
 }
 
-void ChamberRun(SCPI_C commands, SCPI_P parameters, Stream& interface) {
+void ChamberMode(SCPI_C commands, SCPI_P parameters, Stream& interface) {
   String last_header = String(commands.Last());
   last_header.toUpperCase();
   if (last_header.startsWith("HEAT")) {
     chamber_state = heating_state;
-  } else { // "DEC"
+    heatController.start();
+    coolController.stop();
+  } else {
     chamber_state = cooling_state;
+    heatController.stop();
+    coolController.start();
   }
 }
 void ChamberState(SCPI_C commands, SCPI_P parameters, Stream& interface) {
@@ -234,7 +253,25 @@ void ChamberState(SCPI_C commands, SCPI_P parameters, Stream& interface) {
   {
     interface.println(":heating_state");
   } else if (chamber_state == cooling_state)
-  { // "DEC"
+  { 
     interface.println(":cooling_state");
+  }
+}
+
+void ChamberRun(SCPI_C commands, SCPI_P parameters, Stream& interface) {
+  system_running = true;
+}
+
+void ChamberStop(SCPI_C commands, SCPI_P parameters, Stream& interface) {
+  system_running = false;
+}
+
+void isChamberRun(SCPI_C commands, SCPI_P parameters, Stream& interface) {
+  if (system_running)
+  {
+    interface.println("Chamber Running");
+  } else
+  { 
+    interface.println("Chamber NOT Running");
   }
 }
