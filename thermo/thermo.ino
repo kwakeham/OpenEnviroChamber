@@ -114,7 +114,7 @@ void setup() {
   statusupdate("Waiting", system_running);
 
   my_instrument.RegisterCommand(F("*IDN?"), &Identify);
-  my_instrument.SetCommandTreeBase(F("SYSTem:ENVI"));
+  my_instrument.SetCommandTreeBase(F("ENVI"));
     my_instrument.RegisterCommand(F(":SETTemperature"), &SetTemperature);
     my_instrument.RegisterCommand(F(":GETSettemperature?"), &GetSetTemperature);
     my_instrument.RegisterCommand(F(":TEMPerature?"), &GetTemperature);
