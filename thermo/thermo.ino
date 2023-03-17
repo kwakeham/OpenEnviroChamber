@@ -12,8 +12,8 @@ Frigidbear
 
 #define compressor_rest_time 6000//0 //60 seconds
 
-#define compressor_pin 13
-#define heater_pin 12
+#define compressor_pin 12
+#define heater_pin 13
 
 // #define SCREEN_WIDTH 128 // OLED display width, in pixels
 // #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -98,10 +98,12 @@ void setup() {
   //set the SSR and Mosfet pin output
   pinMode(compressor_pin, OUTPUT);
   pinMode(heater_pin, OUTPUT);
+  compressor_run(0);
+  heater_control(0);
 
   //setup the two controllers.
   heatController.begin(&chamber_temp, &heat_output, &setpoint, p, i, d);
-  heatController.setOutputLimits(0, 180);
+  heatController.setOutputLimits(0, 255);
   heatController.setWindUpLimits(0, 100); // Growth bounds for the integral term to prevent integral wind-up
   heatController.stop();                // Turn off the PID controller (compute() will not do anything until start() is called)
     
@@ -137,14 +139,8 @@ void loop(void) {
   my_instrument.ProcessInput(Serial, "\n");
   temperature_control();
   // display.display();
-  // coolController.debug(&Serial, "cc", PRINT_INPUT    | // Can include or comment out any of these terms to print
-                                              PRINT_OUTPUT   | // in the Serial plotter
-                                              PRINT_SETPOINT |
-                                              PRINT_BIAS     |
-                                              PRINT_P        |
-                                              PRINT_I        |
-                                              PRINT_D);
-  // delay(500);
+  // 
+  delay(500);
   
 }
 
@@ -168,6 +164,13 @@ void temperature_control(void)
         heatController.compute();
         heater_control(heat_output);
         compressor_control(false); //ensure off
+        heatController.debug(&Serial, "hc", PRINT_INPUT    | // Can include or comment out any of these terms to print
+                                              PRINT_OUTPUT   | // in the Serial plotter
+                                              PRINT_SETPOINT |
+                                              PRINT_BIAS     |
+                                              PRINT_P        |
+                                              PRINT_I        |
+                                              PRINT_D);
         break;
       default:
         break;
