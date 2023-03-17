@@ -137,14 +137,14 @@ void loop(void) {
   my_instrument.ProcessInput(Serial, "\n");
   temperature_control();
   // display.display();
-  coolController.debug(&Serial, "cc", PRINT_INPUT    | // Can include or comment out any of these terms to print
+  // coolController.debug(&Serial, "cc", PRINT_INPUT    | // Can include or comment out any of these terms to print
                                               PRINT_OUTPUT   | // in the Serial plotter
                                               PRINT_SETPOINT |
                                               PRINT_BIAS     |
                                               PRINT_P        |
                                               PRINT_I        |
                                               PRINT_D);
-  delay(500);
+  // delay(500);
   
 }
 
@@ -162,7 +162,7 @@ void temperature_control(void)
       case cooling_state:
         coolController.compute();
         compressor_control(cool_output);
-        heater_control(0);
+        heater_control(0); //ensure off
         break;
       case heating_state:
         heatController.compute();
