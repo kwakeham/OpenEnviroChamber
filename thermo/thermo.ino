@@ -5,8 +5,8 @@ Frigidbear
 #include <SPI.h>
 #include "Adafruit_MAX31855.h"
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include "SSD1306Ascii.h"
+#include "SSD1306AsciiWire.h"
 #include "ArduPID.h"
 #include "Vrekrer_scpi_parser.h"
 
@@ -15,11 +15,17 @@ Frigidbear
 #define compressor_pin 12
 #define heater_pin 11
 
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-#define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+// #define SCREEN_WIDTH 128 // OLED display width, in pixels
+// #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+// // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+// #define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
+// Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// 0X3C+SA0 - 0x3C or 0x3D
+#define I2C_ADDRESS 0x3C
+// Define proper RST_PIN if required.
+#define RST_PIN -1
+SSD1306AsciiWire oled;
 
 #define MAXCS   10
 Adafruit_MAX31855 thermocouple(MAXCS);
@@ -59,12 +65,34 @@ void setup() {
   Serial.begin(115200);
   while (!Serial) delay(1); // wait for Serial on Leonardo/Zero, etc
 
-  // initialize the display: note you may have to change the address the most common are 0X3C and 0X3D
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  display.display();
-  display.clearDisplay();
-  display.display();
+  // // initialize the display: note you may have to change the address the most common are 0X3C and 0X3D
+  // display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  // display.display();
+  // display.clearDisplay();
+  // display.display();
 
+  Wire.begin();
+  Wire.setClock(400000L);
+
+#if RST_PIN >= 0
+  oled.begin(&Adafruit128x64, I2C_ADDRESS, RST_PIN);
+#else // RST_PIN >= 0
+  oled.begin(&Adafruit128x64, I2C_ADDRESS);
+#endif // RST_PIN >= 0
+
+  oled.setFont(Adafruit5x7);
+
+  uint32_t m = micros();
+  oled.clear();
+  oled.println("Hello world!");
+  oled.println("A long line may be truncated");
+  oled.println();
+  oled.set2X();
+  oled.println("2X demo");
+  oled.set1X();
+  oled.print("\nmicros: ");
+  oled.print(micros() - m);
+  
   //ensure the MAX31855 responds
   Serial.println("MAX31855 test");
   delay(200);  // wait for MAX chip to stabilize
@@ -90,6 +118,19 @@ void setup() {
 
   //scpi setup
   statusupdate("Waiting", system_running);
+
+  my_instrument.RegisterCommand(F("*IDN?"), &Identify);
+  my_instrument.SetCommandTreeBase(F("SYSTem:ENVI"));
+    my_instrument.RegisterCommand(F(":TEMPerature"), &SetTemperature);
+    my_instrument.RegisterCommand(F(":TEMPerature?"), &GetTemperature);
+    my_instrument.RegisterCommand(F(":COOL"), &GetTemperature);
+    my_instrument.RegisterCommand(F(":HEAT"), &GetTemperature);
+    
+  my_instrument.PrintDebugInfo(Serial);
+
+  pinMode(ledPin, OUTPUT);
+  pinMode(LED_BUILTIN, INPUT);
+  analogWrite(ledPin, 0);
 }
 
 
@@ -97,7 +138,7 @@ void loop(void) {
   my_instrument.ProcessInput(Serial, "\n");
   readtemp();
   temperature_control();
-  display.display();
+  // display.display();
   delay(100);
 
 }
@@ -150,10 +191,9 @@ void readtemp(void)
   else
   {
     chamber_temp = temporary_temp;
-    display.setTextColor(WHITE,BLACK);        // Draw white text
-    display.setCursor(76,28);             // Start at top-left corner
-    display.print(chamber_temp);
-    display.print(F("c"));
+    oled.setCursor(90,2);
+    oled.print(chamber_temp);
+    oled.print("c");
   }
 }
 
@@ -161,26 +201,28 @@ void readtemp(void)
 //OLED
 void statusupdate(String currentstatus, bool runningstatus)
 {
-  display.setTextSize(1);             // Normal 1:1 pixel scale
-  if(system_running)
-  {
-    display.clearDisplay();
-    display.fillRect(0, 0, SCREEN_WIDTH, 16, WHITE);
-    display.setTextColor(BLACK);        // Draw white text
-    display.setCursor(30,4);             // Start at top-left corner
-    display.print("Running");
+  // display.setTextSize(1);             // Normal 1:1 pixel scale
+  // if(system_running)
+  // {
+  //   display.clearDisplay();
+  //   display.fillRect(0, 0, SCREEN_WIDTH, 16, WHITE);
+  //   display.setTextColor(BLACK);        // Draw white text
+  //   display.setCursor(30,4);             // Start at top-left corner
+  //   display.print("Running");
     
-  } else
-  {
+  // } else
+  // {
     
-    display.clearDisplay();
-    display.drawRect(0, 0, SCREEN_WIDTH, 16, WHITE);
-    display.setTextColor(WHITE);        // Draw white text
-    display.setCursor(30,4);             // Start at top-left corner
-    display.print(currentstatus);
-  }
+  //   display.clearDisplay();
+  //   display.drawRect(0, 0, SCREEN_WIDTH, 16, WHITE);
+  //   display.setTextColor(WHITE);        // Draw white text
+  //   display.setCursor(30,4);             // Start at top-left corner
+  //   display.print(currentstatus);
+  // }
+  oled.setFont(Adafruit5x7);
+  oled.clear();
+  oled.print(currentstatus);
 }
-
 
 //SCPI
 
@@ -190,7 +232,7 @@ void Identify(SCPI_C commands, SCPI_P parameters, Stream& interface) {
   // "<vendor>,<model>,<serial number>,<firmware>"
 }
 
-void SetBrightness(SCPI_C commands, SCPI_P parameters, Stream& interface) {
+void SetTemperature(SCPI_C commands, SCPI_P parameters, Stream& interface) {
   // For simplicity no bad parameter check is done.
   if (parameters.Size() > 0) {
     brightness = constrain(String(parameters[0]).toInt(), 0, 10);
@@ -198,17 +240,6 @@ void SetBrightness(SCPI_C commands, SCPI_P parameters, Stream& interface) {
   }
 }
 
-void GetBrightness(SCPI_C commands, SCPI_P parameters, Stream& interface) {
+void GetTemperature(SCPI_C commands, SCPI_P parameters, Stream& interface) {
   interface.println(String(brightness, DEC));
-}
-
-void IncDecBrightness(SCPI_C commands, SCPI_P parameters, Stream& interface) {
-  String last_header = String(commands.Last());
-  last_header.toUpperCase();
-  if (last_header.startsWith("INC")) {
-    brightness = constrain(brightness + 1, 0, 10);
-  } else { // "DEC"
-    brightness = constrain(brightness - 1, 0, 10);
-  }
-  analogWrite(ledPin, intensity[brightness]);
 }
