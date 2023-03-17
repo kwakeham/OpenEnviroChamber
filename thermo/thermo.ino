@@ -10,10 +10,10 @@ Frigidbear
 #include "ArduPID.h"
 #include "Vrekrer_scpi_parser.h"
 
-#define compressor_rest_time 600//00 //60 seconds
+#define compressor_rest_time 6000//0 //60 seconds
 
-#define compressor_pin 12
-#define heater_pin 13
+#define compressor_pin 13
+#define heater_pin 12
 
 // #define SCREEN_WIDTH 128 // OLED display width, in pixels
 // #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -104,7 +104,10 @@ void setup() {
   heatController.setOutputLimits(0, 180);
   heatController.setWindUpLimits(0, 100); // Growth bounds for the integral term to prevent integral wind-up
   heatController.stop();                // Turn off the PID controller (compute() will not do anything until start() is called)
+    
   coolController.begin(&chamber_temp, &cool_output, &setpoint, p, i, d);
+  coolController.setOutputLimits(-255, 0);
+  coolController.setWindUpLimits(-100, 0); // Growth bounds for the integral term to prevent integral wind-up
   coolController.setSampleTime(compressor_rest_time);      // This should prevent compressor starting more than once per compressor_reset_time
 
   //scpi setup
@@ -134,7 +137,7 @@ void loop(void) {
   my_instrument.ProcessInput(Serial, "\n");
   temperature_control();
   // display.display();
-  heatController.debug(&Serial, "heatController", PRINT_INPUT    | // Can include or comment out any of these terms to print
+  coolController.debug(&Serial, "cc", PRINT_INPUT    | // Can include or comment out any of these terms to print
                                               PRINT_OUTPUT   | // in the Serial plotter
                                               PRINT_SETPOINT |
                                               PRINT_BIAS     |
@@ -157,6 +160,9 @@ void temperature_control(void)
       case idle_state:
         break;
       case cooling_state:
+        coolController.compute();
+        compressor_control(cool_output);
+        heater_control(0);
         break;
       case heating_state:
         heatController.compute();
@@ -175,9 +181,22 @@ void temperature_control(void)
   }
 }
 
-void compressor_control(bool run_compressor)
+void compressor_control(double coolvalue)
 {
-  // digitalWrite(compressor_pin, HIGH);
+  if(coolvalue < -10)
+  {
+    compressor_run(true);
+  }
+  else
+  {
+    compressor_run(false);
+  }
+
+}
+
+void compressor_run(bool compressor_run)
+{
+  digitalWrite(compressor_pin, compressor_run);
 }
 
 void heater_control(double heatvalue)
