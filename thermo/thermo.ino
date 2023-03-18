@@ -47,9 +47,13 @@ double heat_output;
 double cool_output;
 // Arbitrary setpoint and gains - adjust these as fit for your project:
 double setpoint = 0;
-double p = 30;
-double i = 0.05;
-double d = 0;
+double p_h = 30;
+double i_h = 0.05;
+double d_h = 10;
+
+double p_c = 30;
+double i_c = 0.05;
+double d_c = 10;
 
 //two controllers because we might end up tuning differently
 ArduPID heatController;
@@ -102,12 +106,12 @@ void setup() {
   heater_control(0);
 
   //setup the two controllers.
-  heatController.begin(&chamber_temp, &heat_output, &setpoint, p, i, d);
+  heatController.begin(&chamber_temp, &heat_output, &setpoint, p_h, i_h, d_h);
   heatController.setOutputLimits(0, 255);
   heatController.setWindUpLimits(0, 100); // Growth bounds for the integral term to prevent integral wind-up
   heatController.stop();                // Turn off the PID controller (compute() will not do anything until start() is called)
     
-  coolController.begin(&chamber_temp, &cool_output, &setpoint, p, i, d);
+  coolController.begin(&chamber_temp, &cool_output, &setpoint, p_c, i_c, d_c);
   coolController.setOutputLimits(-255, 100); //allow some heat, but not much because we won't update quickly and don't want to fight compressor with heater
   coolController.setWindUpLimits(-20, 0); // limit cooling antiwindup but no heating integral
   coolController.setSampleTime(compressor_rest_time);      // This should prevent compressor starting more than once per compressor_reset_time
@@ -168,7 +172,7 @@ void temperature_control(void)
       case heating_state:
         heatController.compute();
         heater_control(heat_output);
-        compressor_control(false); //ensure off
+        compressor_run(false); //ensure off
         heatController.debug(&Serial, "hc", PRINT_INPUT    | // Can include or comment out any of these terms to print
                                               PRINT_OUTPUT   | // in the Serial plotter
                                               PRINT_SETPOINT |
