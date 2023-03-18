@@ -50,7 +50,7 @@ double cool_output;
 // Arbitrary setpoint and gains - adjust these as fit for your project:
 double setpoint = 0;
 double p_h = 30;
-double i_h = 0.05;
+double i_h = 0.0005; //much lower I term
 double d_h = 0;
 
 double p_c = 11; //1 degree (gain of 10) should be good, but rounding and such so 11 it is
@@ -319,7 +319,9 @@ void ChamberState(SCPI_C commands, SCPI_P parameters, Stream& interface) {
 }
 
 void ChamberRun(SCPI_C commands, SCPI_P parameters, Stream& interface) {
-  system_running = true;
+  system_running = true; 
+  heatController.reset();//reset the I and D terms for heat controller
+  coolController.reset(); //reset the I and D terms for the cooling controller, though it's unlikely we have I and D
 }
 
 void ChamberStop(SCPI_C commands, SCPI_P parameters, Stream& interface) {
