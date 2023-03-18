@@ -60,10 +60,6 @@ ArduPID heatController;
 ArduPID coolController;
 
 SCPI_Parser my_instrument;
-int brightness = 0;
-const int ledPin = 13;
-const int intensity[11] = {0, 3, 5, 9, 15, 24, 38, 62, 99, 159, 255};
-
 
 void setup() {
 
