@@ -10,7 +10,8 @@ Frigidbear
 #include "ArduPID.h"
 #include "Vrekrer_scpi_parser.h"
 
-#define compressor_rest_time 60000 //60 seconds
+#define compressor_rest_time 300000 //5 minutes
+#define cool_loop_time 30000 //30 seconds, we want the cooling loop time to be slower because compressors respond slowly
 
 #define compressor_pin 12
 #define heater_pin 13
@@ -41,6 +42,7 @@ bool system_running = false;
 bool compressor_state = false;
 chamber_state_t chamber_state = idle_state;
 double chamber_temp;
+unsigned long compressor_stop_time = 0;
 
 //ardupid
 double heat_output;
@@ -49,11 +51,11 @@ double cool_output;
 double setpoint = 0;
 double p_h = 30;
 double i_h = 0.05;
-double d_h = 10;
+double d_h = 0;
 
-double p_c = 30;
-double i_c = 0.05;
-double d_c = 10;
+double p_c = 11; //1 degree (gain of 10) should be good, but rounding and such so 11 it is
+double i_c = 0;
+double d_c = 0;
 
 //two controllers because we might end up tuning differently
 ArduPID heatController;
@@ -65,12 +67,6 @@ void setup() {
 
   Serial.begin(115200);
   while (!Serial) delay(1); // wait for Serial on Leonardo/Zero, etc
-
-  // // initialize the display: note you may have to change the address the most common are 0X3C and 0X3D
-  // display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  // display.display();
-  // display.clearDisplay();
-  // display.display();
 
   Wire.begin();
   Wire.setClock(400000L);
@@ -98,7 +94,7 @@ void setup() {
   //set the SSR and Mosfet pin output
   pinMode(compressor_pin, OUTPUT);
   pinMode(heater_pin, OUTPUT);
-  compressor_run(0);
+  compressor_run(0); //This should be okay as it shouldn't update the compressor_state (initialize to false) and therefore compressor_stop_time should still be 0 for edge case on statup
   heater_control(0);
 
   //setup the two controllers.
@@ -110,7 +106,7 @@ void setup() {
   coolController.begin(&chamber_temp, &cool_output, &setpoint, p_c, i_c, d_c);
   coolController.setOutputLimits(-255, 100); //allow some heat, but not much because we won't update quickly and don't want to fight compressor with heater
   coolController.setWindUpLimits(-20, 0); // limit cooling antiwindup but no heating integral
-  coolController.setSampleTime(compressor_rest_time);      // This should prevent compressor starting more than once per compressor_reset_time
+  coolController.setSampleTime(cool_loop_time);      // Slow time, but not too slow, compressor protection code should ensure no damage to compressor
 
   //scpi setup
   statusupdate("Waiting", system_running);
@@ -128,9 +124,6 @@ void setup() {
     my_instrument.RegisterCommand(F(":STOP"), &ChamberStop);
     
   my_instrument.PrintDebugInfo(Serial);
-
-  // pinMode(ledPin, OUTPUT);
-  // analogWrite(ledPin, 0);
 }
 
 
@@ -183,8 +176,7 @@ void temperature_control(void)
   }
   else //if not running make sure to shut off compressor
   {
-    compressor_state = false;
-    compressor_control(compressor_state);
+    compressor_control(false);
     heater_control(0);
   }
 }
@@ -208,10 +200,44 @@ void compressor_control(double coolvalue)
   }
 
 }
-
+//guards the compressor
 void compressor_run(bool compressor_run)
 {
-  digitalWrite(compressor_pin, compressor_run);
+  //true if we want compressor to run
+  if (compressor_run)
+  {  
+    //edge case of startup
+    if(compressor_stop_time == 0)
+    {
+      compressor_state = true;
+      digitalWrite(compressor_pin, true);
+    }
+    else if (millis() > (compressor_stop_time + compressor_rest_time))
+    {
+      compressor_state = true;
+      digitalWrite(compressor_pin, true);
+    }
+    // If it wasn't a startup condition and it hasn't been enought time  to reset the compressor(compressor_rest_time) stay off
+    else
+    {
+      digitalWrite(compressor_pin, false); // I don't think we need this but just in case
+    }
+  }
+  //commanded not to run
+  else
+  {
+    // If the compressor was running and we're now commanded to shut it off
+    // Now we shouldn't be able to store the compressor state until it was on
+    if (compressor_state)
+    {
+      compressor_state = false; //remember the state
+      compressor_stop_time = millis();  //remember the time we shut it off
+      Serial.print("Stop time: "); //a little debug
+      Serial.println(compressor_stop_time);
+    }
+    //always allow shutdown of the compressor
+    digitalWrite(compressor_pin, false);
+  }  
 }
 
 void heater_control(double heatvalue)
