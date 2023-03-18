@@ -48,7 +48,7 @@ double cool_output;
 // Arbitrary setpoint and gains - adjust these as fit for your project:
 double setpoint = 0;
 double p = 30;
-double i = 0.1;
+double i = 0.05;
 double d = 0;
 
 //two controllers because we might end up tuning differently
@@ -108,8 +108,8 @@ void setup() {
   heatController.stop();                // Turn off the PID controller (compute() will not do anything until start() is called)
     
   coolController.begin(&chamber_temp, &cool_output, &setpoint, p, i, d);
-  coolController.setOutputLimits(-255, 0);
-  coolController.setWindUpLimits(-100, 0); // Growth bounds for the integral term to prevent integral wind-up
+  coolController.setOutputLimits(-255, 100); //allow some heat, but not much because we won't update quickly and don't want to fight compressor with heater
+  coolController.setWindUpLimits(-20, 0); // limit cooling antiwindup but no heating integral
   coolController.setSampleTime(compressor_rest_time);      // This should prevent compressor starting more than once per compressor_reset_time
 
   //scpi setup
@@ -139,7 +139,6 @@ void loop(void) {
   my_instrument.ProcessInput(Serial, "\n");
   temperature_control();
   // display.display();
-  // 
   delay(500);
   
 }
@@ -158,7 +157,6 @@ void temperature_control(void)
       case cooling_state:
         coolController.compute();
         compressor_control(cool_output);
-        heater_control(0); //ensure off
         coolController.debug(&Serial, "cc", PRINT_INPUT    | // Can include or comment out any of these terms to print
                                               PRINT_OUTPUT   | // in the Serial plotter
                                               PRINT_SETPOINT |
@@ -200,6 +198,13 @@ void compressor_control(double coolvalue)
   else
   {
     compressor_run(false);
+  }
+  if (coolvalue > 0)
+  {
+    heater_control(coolvalue);
+  } else
+  {
+    heater_control(0); //ensure off
   }
 
 }
