@@ -50,11 +50,11 @@ double cool_output;
 // Arbitrary setpoint and gains - adjust these as fit for your project:
 double setpoint = 0;
 double p_h = 30;
-double i_h = 0.0005; //much lower I term
+double i_h = 0.0002; //much lower I term
 double d_h = 0;
 
 double p_c = 11; //1 degree (gain of 10) should be good, but rounding and such so 11 it is
-double i_c = 0;
+double i_c = 0.0002; //some i term for cooling
 double d_c = 0;
 
 //two controllers because we might end up tuning differently
