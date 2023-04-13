@@ -15,6 +15,7 @@ Frigidbear
 
 #define compressor_pin 12
 #define heater_pin 13
+#define fan_pin 9
 
 // #define SCREEN_WIDTH 128 // OLED display width, in pixels
 // #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -94,6 +95,8 @@ void setup() {
   //set the SSR and Mosfet pin output
   pinMode(compressor_pin, OUTPUT);
   pinMode(heater_pin, OUTPUT);
+  pinMode(fan_pin, OUTPUT);
+  digitalWrite(fan_pin, true); //fan always on for now
   compressor_run(0); //This should be okay as it shouldn't update the compressor_state (initialize to false) and therefore compressor_stop_time should still be 0 for edge case on statup
   heater_control(0);
 
