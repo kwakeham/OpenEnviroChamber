@@ -113,6 +113,8 @@ void setup() {
 
   //scpi setup
   statusupdate("Waiting", system_running);
+  oled.setCursor(0,1);
+  oled.print("Stopped");
 
   my_instrument.RegisterCommand(F("*IDN?"), &Identify);
   my_instrument.SetCommandTreeBase(F("ENVI"));
@@ -305,10 +307,14 @@ void ChamberMode(SCPI_C commands, SCPI_P parameters, Stream& interface) {
     chamber_state = heating_state;
     heatController.start();
     coolController.stop();
+    oled.setCursor(0,0);
+    oled.print("Heating");
   } else {
     chamber_state = cooling_state;
     heatController.stop();
     coolController.start();
+    oled.setCursor(0,0);
+    oled.print("Cooling");
   }
 }
 void ChamberState(SCPI_C commands, SCPI_P parameters, Stream& interface) {
@@ -325,10 +331,15 @@ void ChamberRun(SCPI_C commands, SCPI_P parameters, Stream& interface) {
   system_running = true; 
   heatController.reset();//reset the I and D terms for heat controller
   coolController.reset(); //reset the I and D terms for the cooling controller, though it's unlikely we have I and D
+  oled.setCursor(0,1);
+  oled.print("Running");
+
 }
 
 void ChamberStop(SCPI_C commands, SCPI_P parameters, Stream& interface) {
   system_running = false;
+  oled.setCursor(0,1);
+  oled.print("Stopped");
 }
 
 void isChamberRun(SCPI_C commands, SCPI_P parameters, Stream& interface) {
