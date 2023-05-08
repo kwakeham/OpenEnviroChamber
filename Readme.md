@@ -18,7 +18,7 @@
 - Thick Silicone wire for the 12v, enough to handle 5A but more for safety
 
 # schematic
-![Image of schematic] (https://github.com/kwakeham/OpenEnviroChamber/blob/master/Fritzing/EnvironmentalChamber_sm.jpg)
+![Image of schematic](https://github.com/kwakeham/OpenEnviroChamber/blob/master/Fritzing/EnvironmentalChamber_sm.jpg)
 
 # Notes
 I soldered wires to the back of the Arduino and modules because the push wires tend to be unreliable. I can't have a device that uses high power 12v and 120v AC going on the fritz. I suggest you do the same. Means debuging is easier
